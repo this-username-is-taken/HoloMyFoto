@@ -117,6 +117,8 @@ public class GameStartScanner : MonoBehaviour
     {
         get
         {
+            return false;
+
             // Only allow this when we are actually scanning
             if (!SU.AllowSpatialUnderstanding || SU.ScanState != SpatialUnderstanding.ScanStates.Scanning)
             {
