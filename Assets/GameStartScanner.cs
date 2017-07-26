@@ -7,12 +7,22 @@ using UnityEngine;
 
 public class GameStartScanner : MonoBehaviour
 {
-
-    public float MinAreaForCompletion = 200.0f;
+    public float MinAreaForCompletion = 5.0f;
     public TextMesh ScanningText;
 
     private bool scanComplete = false;
     private SpatialUnderstanding SU;
+
+    const int QueryResultMaxCount = 512;
+    const int DisplayResultMaxCount = 32;
+
+    public float MinHeightOfWallSpace = 0.5f;
+    public float MinWidthOfWallSpace = 0.5f;
+    public float MinHeightAboveFloor = 1.0f;
+
+    private SpatialUnderstandingDllTopology.TopologyResult[] _resultsTopology = new SpatialUnderstandingDllTopology.TopologyResult[QueryResultMaxCount];
+
+    public GameObject hangr;
 
     void Start()
     {
@@ -26,6 +36,29 @@ public class GameStartScanner : MonoBehaviour
         if (SU.AllowSpatialUnderstanding && SU.ScanState == SpatialUnderstanding.ScanStates.Done)
         {
             scanComplete = true;
+
+
+            var resultsTopologyPtr = SpatialUnderstanding.Instance.UnderstandingDLL.PinObject(_resultsTopology);
+            //var locationCount = SpatialUnderstandingDllTopology.QueryTopology_FindLargePositionsOnWalls(
+            //    MinHeightOfWallSpace, MinWidthOfWallSpace, MinHeightAboveFloor, 0.0f, _resultsTopology.Length, resultsTopologyPtr);
+            
+            var locationCount = SpatialUnderstandingDllTopology.QueryTopology_FindLargestWall(resultsTopologyPtr);
+            for (int i = 0; i < locationCount; i++)
+            {
+                var topology = _resultsTopology[i];
+                Debug.Log(topology.position + " | " + topology.normal + " | " + topology.width + ", " + topology.length);
+
+                /*
+                var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                cube.transform.position = topology.position;
+                cube.transform.forward = topology.normal;
+                cube.transform.localScale = new Vector3(1.0f, 0.5f, 0.05f);
+                */
+
+                hangr.transform.position = topology.position;
+                hangr.transform.forward = topology.normal;
+            }
+
         }
     }
 
@@ -59,13 +92,16 @@ public class GameStartScanner : MonoBehaviour
                     {
                         return "Failed to scan find a wall!";
                     }
+                    var stats = SU.UnderstandingDLL.GetStaticPlayspaceStats();
 
                     // The stats tell us if we could potentially finish
                     if (ReadyForCompletion)
                     {
                         return "When ready, air tap to start placing photos";
                     }
-                    return "Look around while we detect walls";
+                    return "Mapped area: " + stats.TotalSurfaceArea +
+                        " Walls found: " + (stats.NumWall_XNeg + stats.NumWall_XPos + stats.NumWall_ZNeg + stats.NumWall_ZPos) +
+                        " Wall area: " + stats.WallSurfaceArea;
                 case SpatialUnderstanding.ScanStates.Finishing:
                     return "Finalizing scan (please wait)";
                 case SpatialUnderstanding.ScanStates.Done:
@@ -95,7 +131,7 @@ public class GameStartScanner : MonoBehaviour
             }
             var stats = SU.UnderstandingDLL.GetStaticPlayspaceStats();
 
-            if (stats.VirtualWallSurfaceArea > MinAreaForCompletion)
+            if (stats.WallSurfaceArea > MinAreaForCompletion)
             {
                 return true;
             }
